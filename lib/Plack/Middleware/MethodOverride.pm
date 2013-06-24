@@ -4,7 +4,6 @@ use strict;
 use 5.8.1;
 use parent qw(Plack::Middleware);
 use Plack::Request;
-use Data::Dumper;
 our $VERSION = '0.11';
 
 my %ALLOWED = map { $_ => undef } qw(GET HEAD PUT DELETE OPTIONS TRACE CONNECT);
