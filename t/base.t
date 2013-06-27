@@ -1,10 +1,12 @@
 #!/usr/bin/env perl -w
 
 use strict;
-use Test::More tests => 33;
+use Test::More tests => 35;
 #use Test::More 'no_plan';
 use Plack::Test;
 use URI;
+use Data::Dumper;
+use HTTP::Request::Common;
 
 BEGIN { use_ok 'Plack::Middleware::MethodOverride' or die; }
 
@@ -17,6 +19,17 @@ my $base_app = sub {
     ];
 };
 ok my $app = Plack::Middleware::MethodOverride->wrap($base_app),
+    'Create MethodOverride app with no args';
+
+my $base_app2 = sub {
+    my $env = shift;
+    return [
+        200,
+        ['Content-Type' => 'text/plain'],
+        [ Dumper $env ]
+    ];
+};
+ok my $app2 = Plack::Middleware::MethodOverride->wrap($base_app2),
     'Create MethodOverride app with no args';
 
 my $uri = URI->new('/');
@@ -106,6 +119,13 @@ for my $meth (qw(FOO SUCK CALL EXEC)) {
         is $res->content, "POST (POST)", "Should not support $meth";
     };
 }
+
+my $req = POST('/', [ 'x-tunneled-method' => 'DELETE' ]);
+test_psgi $app, sub {
+    my $res = shift->($req);
+    is $res->content, 'DELETE (POST)', 'Should send DELETE over POST';
+};
+
 ##############################################################################
 # Now modify the param and the header.
 ok $app = Plack::Middleware::MethodOverride->wrap(
@@ -125,3 +145,4 @@ test_psgi $app, sub {
     my $res = shift->(HTTP::Request->new(POST => '/', $head));
     is $res->content, 'DELETE (POST)', 'Should send DELETE over POST via custom header';
 };
+

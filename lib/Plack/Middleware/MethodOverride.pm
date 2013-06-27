@@ -3,7 +3,8 @@ package Plack::Middleware::MethodOverride;
 use strict;
 use 5.8.1;
 use parent qw(Plack::Middleware);
-use URI;
+use Plack::Request;
+use Data::Dumper;
 our $VERSION = '0.11';
 
 my %ALLOWED = map { $_ => undef } qw(GET HEAD PUT DELETE OPTIONS TRACE CONNECT);
@@ -26,13 +27,11 @@ sub call {
             # Google does this.
             $env->{REQUEST_METHOD} = uc $override if exists $ALLOWED{uc $override };
         } elsif (my $q = $env->{QUERY_STRING}) {
-            # Parse the query string.
-            my $uri = URI->new('/');
-            $uri->query($q);
-            my %form = $uri->query_form;
-            if (my $override = $form{$self->param}) {
-                $env->{REQUEST_METHOD} = uc $override if exists $ALLOWED{uc $override };
-            }
+            my $override = $self->param_method($env);
+            $env->{REQUEST_METHOD} = uc $override if exists $ALLOWED{ uc $override };
+        } else {
+            my $override = $self->body_method($env);
+            $env->{REQUEST_METHOD} = uc $override if exists $ALLOWED{ uc $override };
         }
     }
     $self->app->($env);
@@ -54,6 +53,26 @@ sub param {
     my $self = shift;
     return $self->{param} unless @_;
     return $self->{param} = shift;
+}
+
+sub param_method {
+    my ($self, $env) = @_;
+    my $name = $self->param;
+    if ($env->{QUERY_STRING} =~ /${name}=[a-zA-Z]+/){
+      my($key, $value) = split(/=/, $&, 2);
+      return $value;
+    }
+    return '';
+}
+
+sub body_method {
+    my ($self, $env) = @_;
+    my $req = Plack::Request->new($env);
+    my $name = $self->param;
+    if (my $value = $req->body_parameters->{$name}){
+        return $value;
+    }
+    return '';
 }
 
 1;
